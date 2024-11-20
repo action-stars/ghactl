@@ -1,0 +1,183 @@
+name: Validate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions: read-all
+
+jobs:
+  validate:
+    name: Validate
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set-up Go
+        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version-file: go.mod
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@971e284b6050e8a5849b72094c50ab08da042db8 # v6.1.1
+
+      - name: Run go test
+        run: go test .
+
+      - name: Run go build
+        run: go build -o dist/ .
+
+  e2e:
+    name: End-2-End
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set-up Go
+        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version-file: go.mod
+
+      - name: Run go build
+        run: go build -o dist/ .
+
+      - name: Setup Tests
+        id: test_setup
+        run: |
+          set -euo pipefail
+
+          multi_line_value='test
+          multiline
+          value'
+
+          {
+            echo "env_not_set_key=TEST_NOT_SET"
+            echo "env_single_line_key=TEST_MY_VAR"
+            echo "env_single_line_value=test value"
+            echo "env_multi_line_key=TEST_MY_VAR_MULTI"
+            echo "env_multi_line_value<<EOF"
+            echo "${multi_line_value}"
+            echo "EOF"
+            echo "output_single_line_key=test_my_output"
+            echo "output_single_line_value=test output"
+            echo "output_multi_line_key=test_my_output_multi"
+            echo "output_multi_line_value<<EOF"
+            echo "${multi_line_value}"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Use CLI for ENV
+        id: test_env
+        run: |
+          set -euo pipefail
+
+          cmd="./dist/ghactl"
+
+          not_set_key="${{ steps.test_setup.outputs.env_not_set_key }}"
+          single_line_key="${{ steps.test_setup.outputs.env_single_line_key }}"
+          single_line_value="${{ steps.test_setup.outputs.env_single_line_value }}"
+          multi_line_key="${{ steps.test_setup.outputs.env_multi_line_key }}"
+          multi_line_value="${{ steps.test_setup.outputs.env_multi_line_value }}"
+
+          echo "${not_set_key}=test" >> "${GITHUB_ENV}"
+
+          "${cmd}" env clear --key="${not_set_key}" --verbose
+          "${cmd}" env set --key="${single_line_key}" --value="${single_line_value}" --verbose
+          "${cmd}" env set --key="${multi_line_key}" --value="${multi_line_value}" --verbose
+
+      - name: Check CLI ENV
+        run: |
+          set -euo pipefail
+
+          not_set_key="${{ steps.test_setup.outputs.env_not_set_key }}"
+          single_line_key="${{ steps.test_setup.outputs.env_single_line_key }}"
+          single_line_value="${{ steps.test_setup.outputs.env_single_line_value }}"
+          multi_line_key="${{ steps.test_setup.outputs.env_multi_line_key }}"
+          multi_line_value="${{ steps.test_setup.outputs.env_multi_line_value }}"
+
+          if [[ -n "${!not_set_key:-}" ]]; then
+            echo "${not_set_key:-} is still set"
+            exit 1
+          fi
+
+          if [[ -z "${!single_line_key:-}" ]] && [[ "${!single_line_key:-}" != "${single_line_value}" ]]; then
+            echo "${single_line_key:-} is not set correctly"
+            exit 1
+          fi
+
+          if [[ -z "${!multi_line_key:-}" ]] && [[ "${!multi_line_key:-}" != "${multi_line_value}" ]]; then
+            echo "${multi_line_key:-} is not set correctly"
+            exit 1
+          fi
+
+      - name: Use CLI for Output
+        id: test_output
+        run: |
+          set -euo pipefail
+
+          cmd="./dist/ghactl"
+
+          single_line_key="${{ steps.test_setup.outputs.output_single_line_key }}"
+          single_line_value="${{ steps.test_setup.outputs.output_single_line_value }}"
+          multi_line_key="${{ steps.test_setup.outputs.output_multi_line_key }}"
+          multi_line_value="${{ steps.test_setup.outputs.output_multi_line_value }}"
+
+          "${cmd}" output set --key="${single_line_key}" --value="${single_line_value}" --verbose
+          "${cmd}" output set --key="${multi_line_key}" --value="${multi_line_value}" --verbose
+
+      - name: Check CLI Output
+        run: |
+          set -euo pipefail
+
+          single_line_key="${{ steps.test_setup.outputs.output_single_line_key }}"
+          single_line_value="${{ steps.test_setup.outputs.output_single_line_value }}"
+          multi_line_key="${{ steps.test_setup.outputs.output_multi_line_key }}"
+          multi_line_value="${{ steps.test_setup.outputs.output_multi_line_value }}"
+
+          if [[ "${{ steps.test_output.outputs.test_my_output }}" != "${single_line_value}" ]]; then
+            echo "Single line output is not set correctly"
+            exit 1
+          fi
+
+          if [[ "${{ steps.test_output.outputs.test_my_output_multi }}" != "${multi_line_value}" ]]; then
+            echo "Single line output is not set correctly"
+            exit 1
+          fi
+
+      - name: Use CLI for Tool Cache
+        run: |
+          set -euo pipefail
+
+          cmd="./dist/ghactl"
+
+          "${cmd}" tool cache get --verbose
+
+          "${cmd}" tool cache find-all --name=node --verbose
+
+          "${cmd}" tool cache find --name=node --verbose
+
+          "${cmd}" tool cache find --name=node --version="^20.0.0" --verbose
+
+          yq_version="$(yq --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
+          if [[ "$("${cmd}" tool version check --version="${yq_version}" --version-spec="^4.0.0" --verbose)" != true ]]; then
+            echo "yq version is not valid"
+          else
+            echo "yq version is valid"
+          fi
