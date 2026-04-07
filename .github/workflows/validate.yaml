@@ -1,0 +1,251 @@
+name: Validate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: read-all
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Go mod download
+        run: go mod download
+      - name: Run linters
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+        with:
+          version: latest
+          args: --timeout=10m
+      - name: Setup rumdl
+        uses: action-stars/install-tool-from-github-release@1fa61c3bea52eca3bcdb1f5c961a3b113fe7fa54 # v0.2.6
+        with:
+          github_token: ${{ github.token }}
+          owner: rvben
+          repository: rumdl
+          filename_format: "{name}-v{version}-{arch}-{os}.{ext}"
+          arch_amd64: x86_64
+          os_linux: unknown-linux-gnu
+          check_command: rumdl --version
+          version: latest
+      - name: Lint markdown
+        run: rumdl check --output-format github .
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Go mod download
+        run: go mod download
+      - name: Test
+        id: test
+        env:
+          INPUT_MIN_COVERAGE: "60"
+        run: |
+          set -euo pipefail
+
+          coverage_file="coverage.out"
+          coverage_report_file="coverage.txt"
+          cobertura_file="cobertura.xml"
+
+          go install github.com/boumenot/gocover-cobertura@latest
+
+          go test -v -covermode=atomic -coverprofile="${coverage_file}" ./...
+          go tool cover -func="${coverage_file}" | tee "${coverage_report_file}"
+          gocover-cobertura < "${coverage_file}" > "${cobertura_file}"
+
+          coverage="$(grep -E 'total:.+' "${coverage_report_file}" | grep -Eo '[0-9]+\.[0-9]+')"
+          coverage_ok="false"
+
+          if (( $(echo "${coverage} >= ${INPUT_MIN_COVERAGE}" | bc -l) )); then
+            coverage_ok="true"
+          fi
+
+          {
+            echo "min_coverage=${INPUT_MIN_COVERAGE}"
+            echo "coverage_file=${coverage_file}"
+            echo "coverage_report_file=${coverage_report_file}"
+            echo "cobertura_file=${cobertura_file}"
+            echo "coverage=${coverage}"
+            echo "coverage_ok=${coverage_ok}"
+          } >> "${GITHUB_OUTPUT}"
+
+          if [[ "${coverage_ok}" != "true" ]]; then
+            echo "::error::coverage ${coverage}% is below required ${INPUT_MIN_COVERAGE}%"
+            exit 1
+          fi
+      - name: Upload coverage report
+        uses: actions/upload-code-coverage@b969047092a77c8a56c9e406ea153324b286c8db # v1.0.0
+        with:
+          language: Go
+          label: code-coverage
+          file: ${{ steps.test.outputs.cobertura_file }}
+      - name: Coverage summary
+        if: always() && steps.test.outputs.coverage_file != ''
+        env:
+          INPUT_COVERAGE_REPORT_FILE: ${{ steps.test.outputs.coverage_report_file }}
+          INPUT_MIN_COVERAGE: ${{ steps.test.outputs.min_coverage }}
+          INPUT_TOTAL_COVERAGE: ${{ steps.test.outputs.coverage }}
+          INPUT_COVERAGE_OK: ${{ steps.test.outputs.coverage_ok }}
+        run: |
+          set -euo pipefail
+
+          report="$(cat "${INPUT_COVERAGE_REPORT_FILE}")"
+
+          if [[ "${INPUT_COVERAGE_OK}" == "true" ]]; then
+            status="✅"
+          else
+            status="❌"
+          fi
+
+          printf '## Test Coverage
+
+          _Coverage_: **%s%%** (required: %s%%) %s
+
+          <details><summary>Details</summary>
+
+          ```text
+          %s
+          ```
+
+          </details>
+          ' "${INPUT_TOTAL_COVERAGE}" "${INPUT_MIN_COVERAGE}" "${status}" "${report}" >> "${GITHUB_STEP_SUMMARY}"
+      - name: Upload coverage artifact
+        if: always() && steps.test.outputs.coverage_file != ''
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: coverage
+          path: |
+            ${{ steps.test.outputs.coverage_file }}
+            ${{ steps.test.outputs.coverage_report_file }}
+          if-no-files-found: error
+          retention-days: 7
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Setup Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Install Syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          syft-version: latest
+
+      - name: Setup Cosign
+        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+
+      - name: Run GoReleaser
+        id: goreleaser
+        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7.0.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          args: build --clean --snapshot
+
+      - name: Get build metadata
+        id: metadata
+        env:
+          INPUT_METADATA: ${{ steps.goreleaser.outputs.metadata }}
+          INPUT_ARTIFACTS: ${{ steps.goreleaser.outputs.artifacts }}
+        run: |
+          set -euo pipefail
+
+          project_name="$(jq --raw-output '.project_name' <<<"${INPUT_METADATA}")"
+          version="$(jq --raw-output '.version' <<<"${INPUT_METADATA}")"
+
+          output_dir="$(jq --raw-output '.[] | select(.type == "Metadata").path | split("/")[:-1] | join("/")' <<<"${INPUT_ARTIFACTS}")"
+
+          {
+            echo "name=${project_name}"
+            echo "version=${version}"
+            echo "output_dir=${output_dir}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Upload artifact
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: binaries
+          path: ${{ steps.metadata.outputs.output_dir }}
+          if-no-files-found: error
+          retention-days: 7
+
+    outputs:
+      name: ${{ steps.metadata.outputs.name }}
+      version: ${{ steps.metadata.outputs.version }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+
+  check:
+    name: Check
+    needs:
+      - lint
+      - test
+      - build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check
+        env:
+          INPUT_RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          read -a results <<< "${INPUT_RESULTS}"
+          for result in "${results[@]}"; do
+            if [[ "${result}" == "failure" ]] || [[ "${result}" == "cancelled" ]]; then
+              echo "::error::Workflow failed!"
+              exit 1
+            fi
+          done

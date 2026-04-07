@@ -1,0 +1,12 @@
+[global]
+disable = ["MD013", "MD028"]
+
+[MD024]
+siblings-only = true
+
+[MD033]
+allowed-elements = ["a", "br", "details", "summary", "sub", "sup"]
+
+[MD052]
+shortcut-syntax = true
+
