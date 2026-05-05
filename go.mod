@@ -3,11 +3,11 @@ module github.com/action-stars/ghactl
 go 1.26
 
 require (
-	github.com/Masterminds/semver/v3 v3.4.0
+	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/google/go-github/v85 v85.0.0
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/matryer/is v1.4.1
-	github.com/urfave/cli/v3 v3.7.0
+	github.com/urfave/cli/v3 v3.8.0
 	golang.org/x/crypto v0.50.0
 )
 
