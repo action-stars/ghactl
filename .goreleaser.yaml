@@ -1,0 +1,47 @@
+# Visit https://goreleaser.com for documentation on how to customize this
+# behavior.
+version: 2
+
+env:
+  - COSIGN_YES=true
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - "-s -w -X main.version={{.Version}} -X main.commit={{.Commit}}"
+    goos:
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+sboms:
+  - id: default
+    artifacts: source
+
+checksum:
+  name_template: checksums.txt
+
+signs:
+  - signature: "${artifact}.sbom.json.bundle"
+    cmd: cosign
+    args:
+      - sign-blob
+      - --new-bundle-format
+      - --bundle
+      - "${signature}"
+      - "${artifact}"
+    artifacts: checksum
+
+changelog:
+  disable: false
+  use: github
