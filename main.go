@@ -7,6 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/action-stars/ghactl/internal/cmd/path"
 	"github.com/action-stars/ghactl/internal/cmd/tool"
 )
 
@@ -33,6 +34,7 @@ func main() {
 			return ctx, nil
 		},
 		Commands: []*cli.Command{
+			path.New(),
 			tool.New(),
 		},
 	}

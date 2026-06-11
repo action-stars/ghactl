@@ -1,15 +1,15 @@
 package github
 
-import "github.com/google/go-github/v85/github"
+import "github.com/google/go-github/v88/github"
 
 // GetClient returns a GitHub client.
 // If a token is provided, it will be used for authentication.
-func GetClient(token string) *github.Client {
-	client := github.NewClient(nil)
+func GetClient(token *string) (*github.Client, error) {
+	options := []github.ClientOptionsFunc{}
 
-	if token != "" {
-		client = client.WithAuthToken(token)
+	if token != nil && *token != "" {
+		options = append(options, github.WithAuthToken(*token))
 	}
 
-	return client
+	return github.NewClient(options...)
 }

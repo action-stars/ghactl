@@ -11,6 +11,8 @@ The official toolkit packages only work in JavaScript/TypeScript actions. [Workf
 
 ## Features
 
+- Add entries to the GitHub Actions PATH for subsequent workflow steps
+- Install and cache tools from GitHub Releases
 - Find, list, and cache tools in the runner tool cache with semver version matching
 - Download files from URLs with automatic retries
 - Extract `.tar`, `.tar.gz`, and `.zip` archives
@@ -29,15 +31,16 @@ Installation instructions are not yet available.
 
 | Command | Description                  |
 | ------- | ---------------------------- |
-| `tool`  | Manage GitHub runner tools   |
+| `path`  | Manage GitHub Actions PATH entries. |
+| `tool`  | Manage GitHub runner tools.  |
 
 ### Global Flags
 
 | Flag        | Description             |
 | ----------- | ----------------------- |
-| `--verbose` | Enable verbose output   |
-| `--version` | Print the version       |
-| `--help`    | Show help               |
+| `--verbose` | Enable verbose output.  |
+| `--version` | Print the version.      |
+| `--help`    | Show help.              |
 
 ---
 
@@ -47,16 +50,49 @@ Manage GitHub runner tools: download, extract, cache, and check versions.
 
 | Subcommand       | Description                                          |
 | ---------------- | ---------------------------------------------------- |
-| `cache get`      | Get the tool cache directory path                    |
-| `cache find-all` | Find all cached paths for a tool                     |
-| `cache find`     | Find a specific cached tool version                  |
-| `cache add dir`  | Add a directory to the tool cache                    |
-| `cache add file` | Add a file to the tool cache                         |
-| `download`       | Download a tool to a temporary directory             |
-| `extract tar`    | Extract a tar archive to a temporary directory       |
-| `extract tgz`    | Extract a tar.gz archive to a temporary directory    |
-| `extract zip`    | Extract a zip archive to a temporary directory       |
-| `version check`  | Check if a version matches a constraint              |
+| `cache get`      | Get the tool cache directory path.                   |
+| `cache find`     | Find one or more cached tool versions.               |
+| `cache add dir`  | Add a directory to the tool cache.                   |
+| `cache add file` | Add a file to the tool cache.                        |
+| `download`       | Download a tool to a temporary directory.            |
+| `extract tar`    | Extract a tar archive to a temporary directory.      |
+| `extract tgz`    | Extract a tar.gz archive to a temporary directory.   |
+| `extract zip`    | Extract a zip archive to a temporary directory.      |
+| `install`        | Install a tool from a source.                        |
+| `version check`  | Check if a version matches a constraint.             |
+
+---
+
+## `path`
+
+Manage GitHub Actions PATH entries.
+
+| Subcommand  | Description        |
+| ----------- | ------------------ |
+| `add`       | Add a path entry.  |
+
+---
+
+### `path add`
+
+Add a path entry.
+
+This writes to the GitHub Actions `GITHUB_PATH` file and prepends the entry to the current process `PATH`.
+
+| Flag     | Required | Description          |
+| -------- | -------- | -------------------- |
+| `--path` | Yes      | Path entry to add.   |
+
+```sh
+ghactl path add --path "$HOME/.local/bin"
+```
+
+GitHub Actions step example:
+
+```yaml
+- name: Add local bin directory
+  run: ghactl path add --path "${HOME}/.local/bin"
+```
 
 ---
 
@@ -70,35 +106,22 @@ ghactl tool cache get
 
 ---
 
-### `tool cache find-all`
-
-Find all cached paths for a tool.
-
-| Flag     | Required | Default        | Description               |
-| -------- | -------- | -------------- | ------------------------- |
-| `--name` | Yes      |                | Name of the tool          |
-| `--arch` | No       | Runtime GOARCH | Architecture of the tool  |
-
-```sh
-ghactl tool cache find-all --name my-tool
-ghactl tool cache find-all --name my-tool --arch amd64
-```
-
----
-
 ### `tool cache find`
 
-Find the path to a specific cached tool version.
+Find a specific cached tool version path, or all matching cached versions.
 
-| Flag        | Required | Default        | Description               |
-| ----------- | -------- | -------------- | ------------------------- |
-| `--name`    | Yes      |                | Name of the tool          |
-| `--arch`    | No       | Runtime GOARCH | Architecture of the tool  |
-| `--version` | No       | `*` (any)      | Version spec to match     |
+| Flag        | Required | Default        | Description                          |
+| ----------- | -------- | -------------- | ------------------------------------ |
+| `--name`    | Yes      |                | Name of the tool.                    |
+| `--arch`    | No       | Runtime GOARCH | Architecture of the tool.            |
+| `--version` | No       | `*` (any)      | Version spec to match.               |
+| `--all`     | No       | `false`        | Return all matching cached versions. |
 
 ```sh
 ghactl tool cache find --name my-tool --version "^1.0.0"
 ghactl tool cache find --name my-tool --version "1.2.3" --arch arm64
+ghactl tool cache find --name my-tool --all
+ghactl tool cache find --name my-tool --all --version "^1.0.0"
 ```
 
 ---
@@ -109,10 +132,10 @@ Add a directory to the tool cache.
 
 | Flag       | Required | Default        | Description                 |
 | ---------- | -------- | -------------- | --------------------------- |
-| `--source` | Yes      |                | Source directory path       |
-| `--name`   | Yes      |                | Name of the tool            |
-| `--version`| Yes      |                | Version of the tool         |
-| `--arch`   | No       | Runtime GOARCH | Architecture of the tool    |
+| `--source` | Yes      |                | Source directory path.      |
+| `--name`   | Yes      |                | Name of the tool.           |
+| `--version`| Yes      |                | Version of the tool.        |
+| `--arch`   | No       | Runtime GOARCH | Architecture of the tool.   |
 
 ```sh
 ghactl tool cache add dir --source /tmp/extracted --name my-tool --version 1.2.3
@@ -126,11 +149,11 @@ Add a single file to the tool cache.
 
 | Flag            | Required | Default        | Description                       |
 | --------------- | -------- | -------------- | --------------------------------- |
-| `--source`      | Yes      |                | Source file path                  |
-| `--name`        | Yes      |                | Name of the tool                  |
-| `--version`     | Yes      |                | Version of the tool               |
-| `--arch`        | No       | Runtime GOARCH | Architecture of the tool          |
-| `--target-name` | No       | Tool name      | Name to rename the source file to |
+| `--source`      | Yes      |                | Source file path.                 |
+| `--name`        | Yes      |                | Name of the tool.                 |
+| `--version`     | Yes      |                | Version of the tool.              |
+| `--arch`        | No       | Runtime GOARCH | Architecture of the tool.         |
+| `--target-name` | No       | Tool name      | Name to rename the source file to. |
 
 ```sh
 ghactl tool cache add file --source /tmp/my-binary --name my-tool --version 1.0.0
@@ -145,7 +168,7 @@ Download a tool from a URL to a temporary directory. Outputs the path to the dow
 
 | Flag    | Required | Description                    |
 | ------- | -------- | ------------------------------ |
-| `--url` | Yes      | URL to download the tool from  |
+| `--url` | Yes      | URL to download the tool from. |
 
 ```sh
 ghactl tool download --url https://example.com/tool-v1.0.0-linux-amd64.tar.gz
@@ -159,7 +182,7 @@ Extract a tar archive to a temporary directory.
 
 | Flag     | Required | Description            |
 | -------- | -------- | ---------------------- |
-| `--path` | Yes      | Path to the tar archive |
+| `--path` | Yes      | Path to the tar archive. |
 
 ```sh
 ghactl tool extract tar --path /tmp/tool.tar
@@ -173,7 +196,7 @@ Extract a tar.gz archive to a temporary directory.
 
 | Flag     | Required | Description                 |
 | -------- | -------- | --------------------------- |
-| `--path` | Yes      | Path to the tar.gz archive  |
+| `--path` | Yes      | Path to the tar.gz archive. |
 
 ```sh
 ghactl tool extract tgz --path /tmp/tool.tar.gz
@@ -187,10 +210,31 @@ Extract a zip archive to a temporary directory.
 
 | Flag     | Required | Description            |
 | -------- | -------- | ---------------------- |
-| `--path` | Yes      | Path to the zip archive |
+| `--path` | Yes      | Path to the zip archive. |
 
 ```sh
 ghactl tool extract zip --path /tmp/tool.zip
+```
+
+---
+
+### `tool install`
+
+Install a tool from GitHub Releases and cache it in the GitHub runner tool cache.
+
+| Flag          | Required | Default        | Description |
+| ------------- | -------- | -------------- | ----------- |
+| `--owner`     | Yes      |                | GitHub repository owner. |
+| `--repo`      | Yes      |                | GitHub repository name. |
+| `--name`      | No       | Value of `--repo` | Tool cache name. |
+| `--version`   | No       | `latest`       | Version input (`latest` or exact version/tag). |
+| `--arch`      | No       | Runtime GOARCH | Tool architecture. |
+| `--os`        | No       | Runtime GOOS   | Tool operating system. |
+| `--pre-release` | No     | `false`        | Include pre-releases when resolving `latest`. |
+| `--token`     | No       | `GITHUB_TOKEN` | GitHub token used for API access. |
+
+```sh
+ghactl tool install --owner cli --repo cli --version 2.94.0
 ```
 
 ---
@@ -201,8 +245,8 @@ Check if a version satisfies a semver constraint. Outputs `true` or `false`.
 
 | Flag             | Required | Description                     |
 | ---------------- | -------- | ------------------------------- |
-| `--version`      | Yes      | Version to check                |
-| `--version-spec` | Yes      | Version constraint to check against |
+| `--version`      | Yes      | Version to check.               |
+| `--version-spec` | Yes      | Version constraint to check against. |
 
 ```sh
 ghactl tool version check --version 1.2.3 --version-spec "^1.0.0"

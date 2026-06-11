@@ -44,37 +44,67 @@ func TestNew_CacheGet(t *testing.T) {
 	})
 }
 
-func TestNew_CacheFindAll(t *testing.T) {
-	t.Run("outputs_found_tool_versions", func(t *testing.T) {
-		is := is.New(t)
-		setupToolCache(t)
-
-		buf := new(bytes.Buffer)
-		cmd := New()
-		cmd.Writer = buf
-
-		err := cmd.Run(context.Background(), []string{"tool", "cache", "find-all", "--name", "test-tool", "--arch", "amd64"})
-
-		is.NoErr(err)          // should not error
-		is.True(buf.Len() > 0) // should output versions
-	})
-
-	t.Run("produces_no_output_for_missing_tool", func(t *testing.T) {
-		is := is.New(t)
-		setupToolCache(t)
-
-		buf := new(bytes.Buffer)
-		cmd := New()
-		cmd.Writer = buf
-
-		err := cmd.Run(context.Background(), []string{"tool", "cache", "find-all", "--name", "nonexistent", "--arch", "amd64"})
-
-		is.NoErr(err)          // should not error
-		is.Equal(buf.Len(), 0) // should produce no output
-	})
-}
-
 func TestNew_CacheFind(t *testing.T) {
+	t.Run("all", func(t *testing.T) {
+		t.Run("outputs_found_tool_versions", func(t *testing.T) {
+			is := is.New(t)
+			setupToolCache(t)
+
+			buf := new(bytes.Buffer)
+			cmd := New()
+			cmd.Writer = buf
+
+			err := cmd.Run(context.Background(), []string{"tool", "cache", "find", "--all", "--name", "test-tool", "--arch", "amd64"})
+
+			is.NoErr(err)          // should not error
+			is.True(buf.Len() > 0) // should output versions
+		})
+
+		t.Run("produces_no_output_for_missing_tool", func(t *testing.T) {
+			is := is.New(t)
+			setupToolCache(t)
+
+			buf := new(bytes.Buffer)
+			cmd := New()
+			cmd.Writer = buf
+
+			err := cmd.Run(context.Background(), []string{"tool", "cache", "find", "--all", "--name", "nonexistent", "--arch", "amd64"})
+
+			is.NoErr(err)          // should not error
+			is.Equal(buf.Len(), 0) // should produce no output
+		})
+
+		t.Run("filters_versions_with_version_spec", func(t *testing.T) {
+			is := is.New(t)
+			setupToolCache(t)
+
+			buf := new(bytes.Buffer)
+			cmd := New()
+			cmd.Writer = buf
+
+			err := cmd.Run(context.Background(), []string{"tool", "cache", "find", "--all", "--name", "test-tool", "--arch", "amd64", "--version", "^1.0.0"})
+
+			is.NoErr(err) // should not error
+
+			lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+			is.Equal(lines, []string{"1.0.0", "1.0.1", "1.2.0"}) // should include only matching versions
+		})
+
+		t.Run("errors_for_invalid_version_spec", func(t *testing.T) {
+			is := is.New(t)
+			setupToolCache(t)
+
+			buf := new(bytes.Buffer)
+			cmd := New()
+			cmd.Writer = buf
+			cmd.ExitErrHandler = func(_ context.Context, _ *cli.Command, _ error) {}
+
+			err := cmd.Run(context.Background(), []string{"tool", "cache", "find", "--all", "--name", "test-tool", "--arch", "amd64", "--version", "bad"})
+
+			is.True(err != nil) // should error
+		})
+	})
+
 	t.Run("outputs_found_tool_path", func(t *testing.T) {
 		is := is.New(t)
 		setupToolCache(t)

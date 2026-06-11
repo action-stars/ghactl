@@ -5,30 +5,45 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/action-stars/ghactl/internal/toolkit/github"
 	"github.com/action-stars/ghactl/internal/toolkit/toolcache"
 )
 
 // Cmd provides the action logic for tool subcommands.
-type Cmd struct{}
+type Cmd struct {
+	releaseResolver func(ctx context.Context, token, owner, repo, version, osName, arch string, includePreRelease bool) (*github.ReleaseResolution, error)
+}
 
 // New returns the fully-wired "tool" CLI command tree.
 func New() *cli.Command {
-	c := &Cmd{}
+	c := &Cmd{
+		releaseResolver: github.ResolveToolRelease,
+	}
 
 	return &cli.Command{
 		Name:  "tool",
 		Usage: "Manage GitHub runner tools.",
 		Commands: []*cli.Command{
 			c.cacheCommand(),
+			c.installCommand(),
 			c.downloadCommand(),
 			c.extractCommand(),
 			c.versionCommand(),
 		},
 	}
+}
+
+func (c *Cmd) resolveRelease(ctx context.Context, token, owner, repo, version, osName, arch string, includePreRelease bool) (*github.ReleaseResolution, error) {
+	if c.releaseResolver != nil {
+		return c.releaseResolver(ctx, token, owner, repo, version, osName, arch, includePreRelease)
+	}
+	return github.ResolveToolRelease(ctx, token, owner, repo, version, osName, arch, includePreRelease)
 }
 
 // CacheGet returns the tool cache directory path.
@@ -98,6 +113,97 @@ func (c *Cmd) VersionCheck(version, versionSpec string) (bool, error) {
 	return toolcache.CheckVersion(version, versionSpec)
 }
 
+// InstallOptions is the set of options used to install a tool.
+type InstallOptions struct {
+	Name              string
+	Owner             string
+	Repo              string
+	Version           string
+	Arch              string
+	OS                string
+	IncludePreRelease bool
+	Token             string
+}
+
+// Install resolves, downloads, and caches a tool release. It returns the cached tool path.
+func (c *Cmd) Install(ctx context.Context, options InstallOptions) (string, error) {
+	if options.Owner == "" {
+		return "", fmt.Errorf("owner is not defined")
+	}
+
+	if options.Repo == "" {
+		return "", fmt.Errorf("repo is not defined")
+	}
+
+	name := options.Name
+	if name == "" {
+		name = options.Repo
+	}
+
+	arch := defaultArch(options.Arch)
+	version := strings.TrimSpace(options.Version)
+	if version == "" {
+		version = "latest"
+	}
+
+	osName := options.OS
+	if osName == "" {
+		osName = runtime.GOOS
+	}
+
+	resolution, err := c.resolveRelease(ctx, options.Token, options.Owner, options.Repo, version, osName, arch, options.IncludePreRelease)
+	if err != nil {
+		return "", err
+	}
+
+	cachedPath, err := c.CacheFind(name, arch, resolution.Version)
+	if err != nil {
+		return "", err
+	}
+
+	if cachedPath != "" {
+		return cachedPath, nil
+	}
+
+	downloadPath, err := c.Download(ctx, resolution.AssetURL)
+	if err != nil {
+		return "", err
+	}
+
+	assetName := strings.ToLower(resolution.AssetName)
+
+	switch {
+	case strings.HasSuffix(assetName, ".tar.gz") || strings.HasSuffix(assetName, ".tgz"):
+		extractedPath, err := c.ExtractTar(downloadPath, true)
+		if err != nil {
+			return "", err
+		}
+
+		return c.CacheDir(extractedPath, name, resolution.Version, arch)
+	case strings.HasSuffix(assetName, ".tar"):
+		extractedPath, err := c.ExtractTar(downloadPath, false)
+		if err != nil {
+			return "", err
+		}
+
+		return c.CacheDir(extractedPath, name, resolution.Version, arch)
+	case strings.HasSuffix(assetName, ".zip"):
+		extractedPath, err := c.ExtractZip(downloadPath)
+		if err != nil {
+			return "", err
+		}
+
+		return c.CacheDir(extractedPath, name, resolution.Version, arch)
+	default:
+		targetName := filepath.Base(name)
+		if targetName == "." || targetName == string(filepath.Separator) {
+			targetName = name
+		}
+
+		return c.CacheFile(downloadPath, targetName, name, resolution.Version, arch)
+	}
+}
+
 func writeOutput(cmd *cli.Command, v any) error {
 	_, err := fmt.Fprintln(cmd.Root().Writer, v)
 	if err != nil {
@@ -121,6 +227,13 @@ func archFlag() *cli.StringFlag {
 	return &cli.StringFlag{
 		Name:  "arch",
 		Usage: "Architecture of the tool.",
+	}
+}
+
+func osFlag() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:  "os",
+		Usage: "Operating system of the tool.",
 	}
 }
 
