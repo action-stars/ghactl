@@ -1,6 +1,7 @@
 package toolcache
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/matryer/is"
@@ -120,4 +121,93 @@ func TestExtractZip(t *testing.T) {
 			is.True(dirExists) // extracted dir should exist
 		})
 	}
+}
+
+func TestResolveToolDirectory(t *testing.T) {
+	t.Run("returns_path_for_empty_directory", func(t *testing.T) {
+		is := is.New(t)
+		root := t.TempDir()
+
+		result, err := ResolveToolDirectory(root)
+
+		is.NoErr(err)
+		is.Equal(result, root)
+	})
+
+	t.Run("returns_path_with_multiple_items", func(t *testing.T) {
+		is := is.New(t)
+		root := t.TempDir()
+		mustCreateTestFile(t, filepath.Join(root, "file1"), "content")
+		mustCreateTestFile(t, filepath.Join(root, "file2"), "content")
+		mustCreateTestDir(t, filepath.Join(root, "dir1"))
+
+		result, err := ResolveToolDirectory(root)
+
+		is.NoErr(err)
+		is.Equal(result, root)
+	})
+
+	t.Run("steps_into_single_nested_directory", func(t *testing.T) {
+		is := is.New(t)
+		root := t.TempDir()
+		nested := filepath.Join(root, "tool-v1.0.0")
+		mustCreateTestDir(t, nested)
+		mustCreateTestFile(t, filepath.Join(nested, "tool.exe"), "")
+
+		result, err := ResolveToolDirectory(root)
+
+		is.NoErr(err)
+		is.Equal(result, nested)
+	})
+
+	t.Run("steps_into_nested_directory_with_bin_subdirectory", func(t *testing.T) {
+		is := is.New(t)
+		root := t.TempDir()
+		nested := filepath.Join(root, "jsonschema-v1.0.0")
+		mustCreateTestDir(t, nested)
+		bin := filepath.Join(nested, "bin")
+		mustCreateTestDir(t, bin)
+		mustCreateTestFile(t, filepath.Join(bin, "jsonschema"), "")
+		mustCreateTestDir(t, filepath.Join(nested, "lib"))
+
+		result, err := ResolveToolDirectory(root)
+
+		is.NoErr(err)
+		is.Equal(result, bin)
+	})
+
+	t.Run("skips_bin_if_multiple_items_at_root", func(t *testing.T) {
+		is := is.New(t)
+		root := t.TempDir()
+		mustCreateTestDir(t, filepath.Join(root, "bin"))
+		mustCreateTestDir(t, filepath.Join(root, "lib"))
+		mustCreateTestFile(t, filepath.Join(root, "file.txt"), "")
+
+		result, err := ResolveToolDirectory(root)
+
+		is.NoErr(err)
+		is.Equal(result, root)
+	})
+
+	t.Run("handles_non_existent_path", func(t *testing.T) {
+		is := is.New(t)
+		root := t.TempDir()
+		nonExistentPath := filepath.Join(root, "does-not-exist")
+
+		result, err := ResolveToolDirectory(nonExistentPath)
+
+		is.NoErr(err)
+		is.Equal(result, "")
+	})
+
+	t.Run("handles_file_path_error", func(t *testing.T) {
+		is := is.New(t)
+		root := t.TempDir()
+		filePath := filepath.Join(root, "file.txt")
+		mustCreateTestFile(t, filePath, "content")
+
+		_, err := ResolveToolDirectory(filePath)
+
+		is.True(err != nil)
+	})
 }

@@ -24,7 +24,7 @@ Installation instructions are not yet available.
 
 ## Commands
 
-`ghactl` is organised into top-level commands, each covering a distinct area of GitHub Actions functionality.
+to pa`ghactl` is organized into top-level commands, each covering a distinct area of GitHub Actions functionality.
 
 > [!NOTE]
 > More commands will be added over time.
@@ -41,25 +41,6 @@ Installation instructions are not yet available.
 | `--verbose` | Enable verbose output.  |
 | `--version` | Print the version.      |
 | `--help`    | Show help.              |
-
----
-
-## `tool`
-
-Manage GitHub runner tools: download, extract, cache, and check versions.
-
-| Subcommand       | Description                                          |
-| ---------------- | ---------------------------------------------------- |
-| `cache get`      | Get the tool cache directory path.                   |
-| `cache find`     | Find one or more cached tool versions.               |
-| `cache add dir`  | Add a directory to the tool cache.                   |
-| `cache add file` | Add a file to the tool cache.                        |
-| `download`       | Download a tool to a temporary directory.            |
-| `extract tar`    | Extract a tar archive to a temporary directory.      |
-| `extract tgz`    | Extract a tar.gz archive to a temporary directory.   |
-| `extract zip`    | Extract a zip archive to a temporary directory.      |
-| `install`        | Install a tool from a source.                        |
-| `version check`  | Check if a version matches a constraint.             |
 
 ---
 
@@ -87,12 +68,24 @@ This writes to the GitHub Actions `GITHUB_PATH` file to be used in future steps.
 ghactl path add --path "$HOME/.local/bin"
 ```
 
-GitHub Actions step example:
+---
 
-```yaml
-- name: Add local bin directory
-  run: ghactl path add --path "${HOME}/.local/bin"
-```
+## `tool`
+
+Manage GitHub runner tools: download, extract, cache, and check versions.
+
+| Subcommand       | Description                                          |
+| ---------------- | ---------------------------------------------------- |
+| `cache get`      | Get the tool cache directory path.                   |
+| `cache find`     | Find one or more cached tool versions.               |
+| `cache add dir`  | Add a directory to the tool cache.                   |
+| `cache add file` | Add a file to the tool cache.                        |
+| `download`       | Download a tool to a temporary directory.            |
+| `extract tar`    | Extract a tar archive to a temporary directory.      |
+| `extract tgz`    | Extract a tar.gz archive to a temporary directory.   |
+| `extract zip`    | Extract a zip archive to a temporary directory.      |
+| `install`        | Install a tool from a source.                        |
+| `version check`  | Check if a version matches a constraint.             |
 
 ---
 
