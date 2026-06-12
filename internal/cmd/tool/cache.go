@@ -13,7 +13,6 @@ func (c *Cmd) cacheCommand() *cli.Command {
 		Usage: "Manage the tool cache.",
 		Commands: []*cli.Command{
 			c.cacheGetCommand(),
-			c.cacheFindAllCommand(),
 			c.cacheFindCommand(),
 			c.cacheAddCommand(),
 		},
@@ -42,49 +41,17 @@ func (c *Cmd) cacheGetCommand() *cli.Command {
 	}
 }
 
-func (c *Cmd) cacheFindAllCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "find-all",
-		Usage: "Find all the paths to a tool.",
-		Flags: []cli.Flag{
-			toolNameFlag(),
-			archFlag(),
-		},
-		Action: func(_ context.Context, cmd *cli.Command) error {
-			tool := cmd.String("name")
-			arch := defaultArch(cmd.String("arch"))
-
-			slog.Debug("Finding all paths for tool.", slog.String("tool", tool))
-
-			ps, err := c.CacheFindAll(tool, arch)
-			if err != nil {
-				return exitErr(err)
-			}
-
-			if len(ps) == 0 {
-				slog.Debug("Tool not found.", slog.String("tool", tool))
-				return nil
-			}
-
-			for _, p := range ps {
-				if err := writeOutput(cmd, p); err != nil {
-					return err
-				}
-			}
-
-			slog.Debug("Tool found.", slog.String("tool", tool), slog.Int("paths", len(ps)))
-			return nil
-		},
-	}
-}
-
 func (c *Cmd) cacheFindCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "find",
-		Usage: "Find the path to a tool.",
+		Usage: "Find the path or versions of a tool.",
 		Flags: []cli.Flag{
 			toolNameFlag(),
 			archFlag(),
+			&cli.BoolFlag{
+				Name:  "all",
+				Usage: "Return all matching cached versions.",
+			},
 			&cli.StringFlag{
 				Name:  "version",
 				Usage: "Version spec of the tool to find.",
@@ -93,12 +60,52 @@ func (c *Cmd) cacheFindCommand() *cli.Command {
 		Action: func(_ context.Context, cmd *cli.Command) error {
 			tool := cmd.String("name")
 			arch := defaultArch(cmd.String("arch"))
+			all := cmd.Bool("all")
 			versionSpec := cmd.String("version")
 			if versionSpec == "" {
 				versionSpec = "*"
 			}
 
-			slog.Debug("Finding tool.", slog.String("tool", tool), slog.String("versionSpec", versionSpec))
+			slog.Debug("Finding tool.", slog.String("tool", tool), slog.String("versionSpec", versionSpec), slog.Bool("all", all))
+
+			if all {
+				vs, err := c.CacheFindAll(tool, arch)
+				if err != nil {
+					return exitErr(err)
+				}
+
+				if len(vs) == 0 {
+					slog.Debug("Tool not found.", slog.String("tool", tool))
+					return nil
+				}
+
+				count := 0
+
+				for _, v := range vs {
+					match, err := c.VersionCheck(v, versionSpec)
+					if err != nil {
+						return exitErr(err)
+					}
+
+					if !match {
+						continue
+					}
+
+					if err := writeOutput(cmd, v); err != nil {
+						return err
+					}
+
+					count++
+				}
+
+				if count == 0 {
+					slog.Debug("Tool not found.", slog.String("tool", tool))
+					return nil
+				}
+
+				slog.Debug("Tool versions found.", slog.String("tool", tool), slog.Int("versions", count))
+				return nil
+			}
 
 			p, err := c.CacheFind(tool, arch, versionSpec)
 			if err != nil {
