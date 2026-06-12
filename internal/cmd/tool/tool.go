@@ -11,6 +11,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/action-stars/ghactl/internal/toolkit/core"
 	"github.com/action-stars/ghactl/internal/toolkit/github"
 	"github.com/action-stars/ghactl/internal/toolkit/toolcache"
 )
@@ -123,6 +124,7 @@ type InstallOptions struct {
 	OS                string
 	IncludePreRelease bool
 	Token             string
+	AddToPath         bool
 }
 
 // Install resolves, downloads, and caches a tool release. It returns the cached tool path.
@@ -162,6 +164,9 @@ func (c *Cmd) Install(ctx context.Context, options InstallOptions) (string, erro
 	}
 
 	if cachedPath != "" {
+		if options.AddToPath {
+			return cachedPath, core.AddPath(cachedPath)
+		}
 		return cachedPath, nil
 	}
 
@@ -179,29 +184,47 @@ func (c *Cmd) Install(ctx context.Context, options InstallOptions) (string, erro
 			return "", err
 		}
 
-		return c.CacheDir(extractedPath, name, resolution.Version, arch)
+		cachedPath, err = c.CacheDir(extractedPath, name, resolution.Version, arch)
+		if err != nil {
+			return "", err
+		}
 	case strings.HasSuffix(assetName, ".tar"):
 		extractedPath, err := c.ExtractTar(downloadPath, false)
 		if err != nil {
 			return "", err
 		}
 
-		return c.CacheDir(extractedPath, name, resolution.Version, arch)
+		cachedPath, err = c.CacheDir(extractedPath, name, resolution.Version, arch)
+		if err != nil {
+			return "", err
+		}
 	case strings.HasSuffix(assetName, ".zip"):
 		extractedPath, err := c.ExtractZip(downloadPath)
 		if err != nil {
 			return "", err
 		}
 
-		return c.CacheDir(extractedPath, name, resolution.Version, arch)
+		cachedPath, err = c.CacheDir(extractedPath, name, resolution.Version, arch)
+		if err != nil {
+			return "", err
+		}
 	default:
 		targetName := filepath.Base(name)
 		if targetName == "." || targetName == string(filepath.Separator) {
 			targetName = name
 		}
 
-		return c.CacheFile(downloadPath, targetName, name, resolution.Version, arch)
+		cachedPath, err = c.CacheFile(downloadPath, targetName, name, resolution.Version, arch)
+		if err != nil {
+			return "", err
+		}
 	}
+
+	if options.AddToPath {
+		return cachedPath, core.AddPath(cachedPath)
+	}
+
+	return cachedPath, nil
 }
 
 func writeOutput(cmd *cli.Command, v any) error {

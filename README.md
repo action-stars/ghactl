@@ -222,16 +222,17 @@ ghactl tool extract zip --path /tmp/tool.zip
 
 Install a tool from GitHub Releases and cache it in the GitHub runner tool cache.
 
-| Flag          | Required | Default        | Description |
-| ------------- | -------- | -------------- | ----------- |
-| `--owner`     | Yes      |                | GitHub repository owner. |
-| `--repo`      | Yes      |                | GitHub repository name. |
-| `--name`      | No       | Value of `--repo` | Tool cache name. |
-| `--version`   | No       | `latest`       | Version input (`latest` or exact version/tag). |
-| `--arch`      | No       | Runtime GOARCH | Tool architecture. |
-| `--os`        | No       | Runtime GOOS   | Tool operating system. |
-| `--pre-release` | No     | `false`        | Include pre-releases when resolving `latest`. |
-| `--token`     | No       | `GITHUB_TOKEN` | GitHub token used for API access. |
+| Flag            | Required | Default           | Description |
+| --------------- | -------- | ----------------- | ----------- |
+| `--owner`       | Yes      |                   | GitHub repository owner. |
+| `--repo`        | Yes      |                   | GitHub repository name. |
+| `--version`     | No       | `latest`          | Version input (`latest` or exact version/tag). |
+| `--token`       | No       | `GITHUB_TOKEN`    | GitHub token used for API access. |
+| `--name`        | No       | Value of `--repo` | Tool cache name. |
+| `--arch`        | No       | Runtime GOARCH    | Tool architecture. |
+| `--os`          | No       | Runtime GOOS      | Tool operating system. |
+| `--pre-release` | No       | `false`           | Include pre-releases when resolving `latest`. |
+| `--add-to-path` | No       | `true`            | Add the tool directory to PATH. |
 
 ```sh
 ghactl tool install --owner cli --repo cli --version 2.94.0

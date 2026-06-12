@@ -43,6 +43,11 @@ func (c *Cmd) installCommand() *cli.Command {
 				Name:  "token",
 				Usage: "GitHub token. Defaults to GITHUB_TOKEN when unset.",
 			},
+			&cli.BoolFlag{
+				Name:  "add-to-path",
+				Usage: "Add the tool directory to PATH.",
+				Value: true,
+			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			owner := cmd.String("owner")
@@ -56,6 +61,7 @@ func (c *Cmd) installCommand() *cli.Command {
 			if token == "" {
 				token = os.Getenv("GITHUB_TOKEN")
 			}
+			addToPath := cmd.Bool("add-to-path")
 
 			slog.Debug("Installing tool.",
 				slog.String("owner", owner),
@@ -65,6 +71,7 @@ func (c *Cmd) installCommand() *cli.Command {
 				slog.String("arch", arch),
 				slog.String("os", osName),
 				slog.Bool("preRelease", includePreRelease),
+				slog.Bool("addToPath", addToPath),
 			)
 
 			p, err := c.Install(ctx, InstallOptions{
@@ -76,6 +83,7 @@ func (c *Cmd) installCommand() *cli.Command {
 				OS:                osName,
 				IncludePreRelease: includePreRelease,
 				Token:             token,
+				AddToPath:         addToPath,
 			})
 			if err != nil {
 				return exitErr(err)
