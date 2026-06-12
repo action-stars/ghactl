@@ -179,6 +179,7 @@ func normalizeVersion(value string) string {
 // 1. Tool name match (exact, substring, or fallback to repo name)
 // 2. OS and arch specificity (optional but preferred)
 // 3. Archive format preference (tar.gz > tgz > tar > zip)
+// 4. Variant preference (non-musl preferred over musl)
 // Assets matching by name are accepted even without OS/arch specificity.
 func selectAsset(assets []*github.ReleaseAsset, toolName, repo, osName, arch string) (*github.ReleaseAsset, error) {
 	if len(assets) == 0 {
@@ -214,11 +215,11 @@ func selectAsset(assets []*github.ReleaseAsset, toolName, repo, osName, arch str
 		// Allow OS/arch-less matches if name matches; prefer OS/arch-specific matches
 		if osScore == 0 && archScore == 0 {
 			// Name-only match: lower priority
-			score := (nameScore * 10000) + archiveScore(assetName)
+			score := (nameScore * 10000) + archiveScore(assetName) + variantScore(assetName)
 			candidates = append(candidates, &candidate{asset: asset, score: score})
 		} else if osScore > 0 && archScore > 0 {
 			// Full OS+arch match: highest priority
-			score := (nameScore * 10000) + (osScore * 1000) + (archScore * 1000) + archiveScore(assetName)
+			score := (nameScore * 10000) + (osScore * 1000) + (archScore * 1000) + archiveScore(assetName) + variantScore(assetName)
 			candidates = append(candidates, &candidate{asset: asset, score: score})
 		}
 	}
@@ -290,6 +291,14 @@ func archiveScore(name string) int {
 	default:
 		return 0
 	}
+}
+
+func variantScore(name string) int {
+	if strings.Contains(name, "musl") {
+		return -1
+	}
+
+	return 0
 }
 
 func mapOS(osName string) []string {
