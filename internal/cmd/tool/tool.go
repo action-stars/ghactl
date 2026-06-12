@@ -182,7 +182,12 @@ func (c *Cmd) Install(ctx context.Context, options InstallOptions) (string, erro
 			return "", err
 		}
 
-		cachedPath, err = c.CacheDir(extractedPath, name, resolution.Version, arch)
+		resolvedPath, err := toolcache.ResolveToolDirectory(extractedPath)
+		if err != nil {
+			return "", err
+		}
+
+		cachedPath, err = c.CacheDir(resolvedPath, name, resolution.Version, arch)
 		if err != nil {
 			return "", err
 		}
@@ -192,7 +197,12 @@ func (c *Cmd) Install(ctx context.Context, options InstallOptions) (string, erro
 			return "", err
 		}
 
-		cachedPath, err = c.CacheDir(extractedPath, name, resolution.Version, arch)
+		resolvedPath, err := toolcache.ResolveToolDirectory(extractedPath)
+		if err != nil {
+			return "", err
+		}
+
+		cachedPath, err = c.CacheDir(resolvedPath, name, resolution.Version, arch)
 		if err != nil {
 			return "", err
 		}
@@ -202,7 +212,12 @@ func (c *Cmd) Install(ctx context.Context, options InstallOptions) (string, erro
 			return "", err
 		}
 
-		cachedPath, err = c.CacheDir(extractedPath, name, resolution.Version, arch)
+		resolvedPath, err := toolcache.ResolveToolDirectory(extractedPath)
+		if err != nil {
+			return "", err
+		}
+
+		cachedPath, err = c.CacheDir(resolvedPath, name, resolution.Version, arch)
 		if err != nil {
 			return "", err
 		}
