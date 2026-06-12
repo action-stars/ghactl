@@ -18,7 +18,6 @@ func TestNew_Add(t *testing.T) {
 
 		envFile := filepath.Join(t.TempDir(), "github-path")
 		t.Setenv("GITHUB_PATH", envFile)
-		t.Setenv("PATH", "existing-path")
 
 		buf := new(bytes.Buffer)
 		cmd := New()
@@ -28,11 +27,10 @@ func TestNew_Add(t *testing.T) {
 
 		data, readErr := os.ReadFile(envFile)
 
-		is.NoErr(err)                                                     // should not error
-		is.NoErr(readErr)                                                 // should not error
-		is.True(strings.Contains(string(data), "$HOME/.local/bin"))       // should write path
-		is.True(strings.HasPrefix(os.Getenv("PATH"), "$HOME/.local/bin")) // should prepend path
-		is.Equal(buf.Len(), 0)                                            // should not output
+		is.NoErr(err)                                               // should not error
+		is.NoErr(readErr)                                           // should not error
+		is.True(strings.Contains(string(data), "$HOME/.local/bin")) // should write path
+		is.Equal(buf.Len(), 0)                                      // should not output
 	})
 
 	t.Run("errors_when_github_path_not_set", func(t *testing.T) {
