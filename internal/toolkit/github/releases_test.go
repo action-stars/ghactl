@@ -112,4 +112,18 @@ func Test_selectAsset(t *testing.T) {
 
 		is.True(err != nil)
 	})
+
+	t.Run("prefers_non_musl_over_musl_when_both_match", func(t *testing.T) {
+		is := is.New(t)
+
+		assets := []*github.ReleaseAsset{
+			{Name: new("mdq-linux-x64-musl.tar.gz"), BrowserDownloadURL: new("https://example.com/musl")},
+			{Name: new("mdq-linux-x64.tar.gz"), BrowserDownloadURL: new("https://example.com/glibc")},
+		}
+
+		asset, err := selectAsset(assets, "mdq", "mdq", "linux", "amd64")
+
+		is.NoErr(err)
+		is.Equal(asset.GetName(), "mdq-linux-x64.tar.gz")
+	})
 }
