@@ -100,10 +100,8 @@ func IssueCommand(w io.Writer, c *Command) error {
 // generateDelimiter generates a unique delimiter for file commands.
 func generateDelimiter() string {
 	b := make([]byte, 16)
-	// rand.Read from crypto/rand always returns len(b) bytes and a nil error on
-	// supported platforms; a panic here indicates a broken runtime.
 	_, _ = rand.Read(b)
-	return fmt.Sprintf("ghadelimiter_%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+	return fmt.Sprintf("ghactl_%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
 // IssueFileCommand writes a key-value pair to a GitHub Actions environment file.

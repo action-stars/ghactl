@@ -9,16 +9,11 @@ import (
 const pathFileLookup = "GITHUB_PATH"
 
 // AddPath writes a path entry to be persisted for the current GitHub Actions workflow run.
-// It also prepends the path to the current process PATH.
-func AddPath(value string) error {
-	p := os.Getenv(pathFileLookup)
-	if p == "" {
+func AddPath(p string) error {
+	fp, ok := os.LookupEnv(pathFileLookup)
+	if !ok || fp == "" {
 		return fmt.Errorf("%s is not defined", pathFileLookup)
 	}
 
-	if err := IssueFileCommand(p, value, ""); err != nil {
-		return err
-	}
-
-	return os.Setenv("PATH", value+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return writeFile(fp, []byte(p+"\n"))
 }

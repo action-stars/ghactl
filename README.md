@@ -77,7 +77,7 @@ Manage GitHub Actions PATH entries.
 
 Add a path entry.
 
-This writes to the GitHub Actions `GITHUB_PATH` file and prepends the entry to the current process `PATH`.
+This writes to the GitHub Actions `GITHUB_PATH` file to be used in future steps.
 
 | Flag     | Required | Description          |
 | -------- | -------- | -------------------- |
