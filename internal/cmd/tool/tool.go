@@ -18,14 +18,12 @@ import (
 
 // Cmd provides the action logic for tool subcommands.
 type Cmd struct {
-	releaseResolver func(ctx context.Context, token, owner, repo, version, osName, arch string, includePreRelease bool) (*github.ReleaseResolution, error)
+	releaseResolver func(ctx context.Context, token, owner, repo, toolName, version, osName, arch string, includePreRelease bool) (*github.ReleaseResolution, error)
 }
 
 // New returns the fully-wired "tool" CLI command tree.
 func New() *cli.Command {
-	c := &Cmd{
-		releaseResolver: github.ResolveToolRelease,
-	}
+	c := &Cmd{}
 
 	return &cli.Command{
 		Name:  "tool",
@@ -40,11 +38,11 @@ func New() *cli.Command {
 	}
 }
 
-func (c *Cmd) resolveRelease(ctx context.Context, token, owner, repo, version, osName, arch string, includePreRelease bool) (*github.ReleaseResolution, error) {
+func (c *Cmd) resolveRelease(ctx context.Context, token, owner, repo, toolName, version, osName, arch string, includePreRelease bool) (*github.ReleaseResolution, error) {
 	if c.releaseResolver != nil {
-		return c.releaseResolver(ctx, token, owner, repo, version, osName, arch, includePreRelease)
+		return c.releaseResolver(ctx, token, owner, repo, toolName, version, osName, arch, includePreRelease)
 	}
-	return github.ResolveToolRelease(ctx, token, owner, repo, version, osName, arch, includePreRelease)
+	return github.ResolveToolRelease(ctx, token, owner, repo, toolName, version, osName, arch, includePreRelease)
 }
 
 // CacheGet returns the tool cache directory path.
@@ -153,7 +151,7 @@ func (c *Cmd) Install(ctx context.Context, options InstallOptions) (string, erro
 		osName = runtime.GOOS
 	}
 
-	resolution, err := c.resolveRelease(ctx, options.Token, options.Owner, options.Repo, version, osName, arch, options.IncludePreRelease)
+	resolution, err := c.resolveRelease(ctx, options.Token, options.Owner, options.Repo, name, version, osName, arch, options.IncludePreRelease)
 	if err != nil {
 		return "", err
 	}

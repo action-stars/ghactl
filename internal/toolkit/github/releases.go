@@ -18,7 +18,10 @@ type ReleaseResolution struct {
 }
 
 // ResolveToolRelease selects a release and matching asset for a tool install.
-func ResolveToolRelease(ctx context.Context, token, owner, repo, version, osName, arch string, includePreRelease bool) (*ReleaseResolution, error) {
+// Assets are matched primarily by tool name (exact or substring match preferred),
+// with optional fallback to repo name. OS and arch indicators are optional but
+// preferred when present. Returns an error if no matching asset is found.
+func ResolveToolRelease(ctx context.Context, token, owner, repo, toolName, version, osName, arch string, includePreRelease bool) (*ReleaseResolution, error) {
 	if owner == "" {
 		return nil, fmt.Errorf("owner is not defined")
 	}
@@ -55,7 +58,7 @@ func ResolveToolRelease(ctx context.Context, token, owner, repo, version, osName
 		return nil, err
 	}
 
-	asset, err := selectAsset(release.Assets, osName, arch)
+	asset, err := selectAsset(release.Assets, toolName, repo, osName, arch)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +174,13 @@ func normalizeVersion(value string) string {
 	return version
 }
 
-func selectAsset(assets []*github.ReleaseAsset, osName, arch string) (*github.ReleaseAsset, error) {
+// selectAsset selects the best matching release asset based on tool name and OS/arch.
+// Scoring priority:
+// 1. Tool name match (exact, substring, or fallback to repo name)
+// 2. OS and arch specificity (optional but preferred)
+// 3. Archive format preference (tar.gz > tgz > tar > zip)
+// Assets matching by name are accepted even without OS/arch specificity.
+func selectAsset(assets []*github.ReleaseAsset, toolName, repo, osName, arch string) (*github.ReleaseAsset, error) {
 	if len(assets) == 0 {
 		return nil, fmt.Errorf("no release assets found")
 	}
@@ -190,19 +199,32 @@ func selectAsset(assets []*github.ReleaseAsset, osName, arch string) (*github.Re
 			continue
 		}
 
-		name := strings.ToLower(asset.GetName())
-		osScore := tokenScore(name, osTokens)
-		archScore := tokenScore(name, archTokens)
-		if osScore == 0 || archScore == 0 {
+		assetName := strings.ToLower(asset.GetName())
+
+		// Score based on name match first (tool name preferred, then repo name)
+		nameScore := scoreNameMatch(assetName, toolName, repo)
+		if nameScore == 0 {
 			continue
 		}
 
-		score := (osScore * 100) + (archScore * 100) + archiveScore(name)
-		candidates = append(candidates, &candidate{asset: asset, score: score})
+		// Score OS and arch matches
+		osScore := tokenScore(assetName, osTokens)
+		archScore := tokenScore(assetName, archTokens)
+
+		// Allow OS/arch-less matches if name matches; prefer OS/arch-specific matches
+		if osScore == 0 && archScore == 0 {
+			// Name-only match: lower priority
+			score := (nameScore * 10000) + archiveScore(assetName)
+			candidates = append(candidates, &candidate{asset: asset, score: score})
+		} else if osScore > 0 && archScore > 0 {
+			// Full OS+arch match: highest priority
+			score := (nameScore * 10000) + (osScore * 1000) + (archScore * 1000) + archiveScore(assetName)
+			candidates = append(candidates, &candidate{asset: asset, score: score})
+		}
 	}
 
 	if len(candidates) == 0 {
-		return nil, fmt.Errorf("no matching release asset found for os=%s arch=%s", osName, arch)
+		return nil, fmt.Errorf("no matching release asset found for tool=%s repo=%s os=%s arch=%s", toolName, repo, osName, arch)
 	}
 
 	sort.Slice(candidates, func(i, j int) bool {
@@ -216,11 +238,33 @@ func selectAsset(assets []*github.ReleaseAsset, osName, arch string) (*github.Re
 		}
 
 		if candidates[i].asset.GetName() != best.asset.GetName() {
-			return nil, fmt.Errorf("ambiguous release assets for os=%s arch=%s", osName, arch)
+			return nil, fmt.Errorf("ambiguous release assets for tool=%s repo=%s os=%s arch=%s", toolName, repo, osName, arch)
 		}
 	}
 
 	return best.asset, nil
+}
+
+// scoreNameMatch returns a score indicating how well the asset name matches the tool.
+// Scoring: 3 for exact match on tool name, 2 for tool name substring,
+// 1 for repo name match, 0 for no match.
+func scoreNameMatch(assetName, toolName, repo string) int {
+	// Prefer exact match on tool name, then repo name
+	if assetName == toolName {
+		return 3 // Exact match on tool name
+	}
+	if strings.Contains(assetName, toolName) {
+		return 2 // Tool name is a substring (e.g., tool name in larger filename)
+	}
+	if repo != "" && repo != toolName {
+		if assetName == repo {
+			return 1 // Exact match on repo name (fallback)
+		}
+		if strings.Contains(assetName, repo) {
+			return 1 // Repo name is a substring (fallback)
+		}
+	}
+	return 0 // No match
 }
 
 func tokenScore(name string, tokens []string) int {

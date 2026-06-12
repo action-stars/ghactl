@@ -1,6 +1,7 @@
 package github
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/go-github/v88/github"
@@ -87,16 +88,27 @@ func Test_selectAsset(t *testing.T) {
 	t.Run("selects_best_matching_asset", func(t *testing.T) {
 		is := is.New(t)
 
-		asset, err := selectAsset(assets, "linux", "amd64")
+		asset, err := selectAsset(assets, "tool", "toolrepo", "linux", "amd64")
 
 		is.NoErr(err)
 		is.Equal(asset.GetName(), "tool_v1.2.3_linux_x64.tar.gz")
 	})
 
-	t.Run("errors_when_no_match", func(t *testing.T) {
+	t.Run("fallback_to_name_match_when_os_arch_not_found", func(t *testing.T) {
 		is := is.New(t)
 
-		_, err := selectAsset(assets, "windows", "arm64")
+		// Tool name matches even without matching OS/arch
+		asset, err := selectAsset(assets, "tool", "toolrepo", "windows", "arm64")
+
+		is.NoErr(err)
+		is.True(asset != nil)
+		is.True(strings.Contains(asset.GetName(), "tool"))
+	})
+
+	t.Run("errors_when_no_name_match", func(t *testing.T) {
+		is := is.New(t)
+
+		_, err := selectAsset(assets, "unknown", "toolrepo", "windows", "arm64")
 
 		is.True(err != nil)
 	})

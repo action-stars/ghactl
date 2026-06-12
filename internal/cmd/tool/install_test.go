@@ -26,10 +26,11 @@ func TestNew_Install(t *testing.T) {
 		defer ts.Close()
 
 		c := &Cmd{
-			releaseResolver: func(_ context.Context, token, owner, repo, version, osName, arch string, includePreRelease bool) (*toolgithub.ReleaseResolution, error) {
+			releaseResolver: func(_ context.Context, token, owner, repo, toolName, version, osName, arch string, includePreRelease bool) (*toolgithub.ReleaseResolution, error) {
 				is.Equal(token, "")
 				is.Equal(owner, "sharkdp")
 				is.Equal(repo, "bat")
+				is.Equal(toolName, "bat")
 				is.Equal(version, "latest")
 				is.True(osName != "")
 				is.True(arch != "")
@@ -62,7 +63,7 @@ func TestNew_Install(t *testing.T) {
 		is.NoErr(cacheErr)
 
 		c := &Cmd{
-			releaseResolver: func(_ context.Context, _, _, _, _, _, _ string, _ bool) (*toolgithub.ReleaseResolution, error) {
+			releaseResolver: func(_ context.Context, _, _, _, _, _, _, _ string, _ bool) (*toolgithub.ReleaseResolution, error) {
 				return &toolgithub.ReleaseResolution{
 					Version:   "1.2.3",
 					AssetName: "bat-1.2.3-linux-x64",
@@ -88,7 +89,7 @@ func TestNew_Install(t *testing.T) {
 		defer ts.Close()
 
 		c := &Cmd{
-			releaseResolver: func(_ context.Context, _, _, _, version, _, _ string, _ bool) (*toolgithub.ReleaseResolution, error) {
+			releaseResolver: func(_ context.Context, _, _, _, _, version, _, _ string, _ bool) (*toolgithub.ReleaseResolution, error) {
 				is.Equal(version, "1.2.3")
 				return &toolgithub.ReleaseResolution{
 					Version:   "1.2.3",
@@ -131,7 +132,7 @@ func TestCmd_Install_validation(t *testing.T) {
 		t.Setenv("RUNNER_TOOL_CACHE", t.TempDir())
 
 		c := &Cmd{
-			releaseResolver: func(_ context.Context, _, _, _, _, _, _ string, _ bool) (*toolgithub.ReleaseResolution, error) {
+			releaseResolver: func(_ context.Context, _, _, _, _, _, _, _ string, _ bool) (*toolgithub.ReleaseResolution, error) {
 				return nil, fmt.Errorf("boom")
 			},
 		}
