@@ -7,7 +7,7 @@ import (
 
 func mustCreateTestDir(t *testing.T, path string) {
 	t.Helper()
-	if err := os.Mkdir(path, 0o755); err != nil {
+	if err := os.MkdirAll(path, 0o755); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -1,6 +1,7 @@
 package toolcache
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -38,8 +39,8 @@ func ExtractZip(zipFile string) (string, error) {
 
 // ResolveToolDirectory navigates nested directories to find the actual tool location.
 // It handles:
-//   - Single root directory (steps into it)
-//   - 'bin' subdirectory (steps into it if it exists after entering a single nested directory)
+//   - Single nested directories
+//   - 'bin' subdirectory after evaluating single nested directories
 //
 // For example, if an archive extracts to:
 //
@@ -51,36 +52,32 @@ func ExtractZip(zipFile string) (string, error) {
 //
 // This will resolve to: extracted/jsonschema-v1.0.0/bin.
 func ResolveToolDirectory(extractedPath string) (string, error) {
-	finalPath := extractedPath
-
-	// Check if directory exists
-	exists, err := fileio.DirExists(finalPath)
+	exists, err := fileio.DirExists(extractedPath)
 	if err != nil {
 		return "", err
 	}
 	if !exists {
-		return "", nil
+		return "", fmt.Errorf("extracted path does not exist: %s", extractedPath)
 	}
 
-	// Check for single root directory
-	entries, err := os.ReadDir(finalPath)
-	if err != nil {
-		return "", err
-	}
-
-	steppedIntoNested := false
-	if len(entries) == 1 && entries[0].IsDir() {
-		finalPath = filepath.Join(finalPath, entries[0].Name())
-		steppedIntoNested = true
-	}
-
-	// Check for bin subdirectory only after stepping into a nested directory
-	if steppedIntoNested {
-		binPath := filepath.Join(finalPath, "bin")
-		if exists, err := fileio.DirExists(binPath); err == nil && exists {
-			finalPath = binPath
+	path := extractedPath
+	for {
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			return "", err
 		}
+
+		if len(entries) != 1 || !entries[0].IsDir() {
+			break
+		}
+
+		path = filepath.Join(path, entries[0].Name())
 	}
 
-	return finalPath, nil
+	binPath := filepath.Join(path, "bin")
+	if exists, err := fileio.DirExists(binPath); err == nil && exists {
+		path = binPath
+	}
+
+	return path, nil
 }

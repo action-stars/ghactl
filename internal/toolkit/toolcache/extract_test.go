@@ -124,7 +124,11 @@ func TestExtractZip(t *testing.T) {
 }
 
 func TestResolveToolDirectory(t *testing.T) {
+	t.Parallel()
+
 	t.Run("returns_path_for_empty_directory", func(t *testing.T) {
+		t.Parallel()
+
 		is := is.New(t)
 		root := t.TempDir()
 
@@ -135,6 +139,8 @@ func TestResolveToolDirectory(t *testing.T) {
 	})
 
 	t.Run("returns_path_with_multiple_items", func(t *testing.T) {
+		t.Parallel()
+
 		is := is.New(t)
 		root := t.TempDir()
 		mustCreateTestFile(t, filepath.Join(root, "file1"), "content")
@@ -148,6 +154,8 @@ func TestResolveToolDirectory(t *testing.T) {
 	})
 
 	t.Run("steps_into_single_nested_directory", func(t *testing.T) {
+		t.Parallel()
+
 		is := is.New(t)
 		root := t.TempDir()
 		nested := filepath.Join(root, "tool-v1.0.0")
@@ -160,7 +168,24 @@ func TestResolveToolDirectory(t *testing.T) {
 		is.Equal(result, nested)
 	})
 
+	t.Run("steps_into_multiple_nested_directories", func(t *testing.T) {
+		t.Parallel()
+
+		is := is.New(t)
+		root := t.TempDir()
+		nested := filepath.Join(root, "tool-v1.0.0", "bin", "amd64")
+		mustCreateTestDir(t, nested)
+		mustCreateTestFile(t, filepath.Join(nested, "tool.exe"), "")
+
+		result, err := ResolveToolDirectory(root)
+
+		is.NoErr(err)
+		is.Equal(result, nested)
+	})
+
 	t.Run("steps_into_nested_directory_with_bin_subdirectory", func(t *testing.T) {
+		t.Parallel()
+
 		is := is.New(t)
 		root := t.TempDir()
 		nested := filepath.Join(root, "jsonschema-v1.0.0")
@@ -176,31 +201,37 @@ func TestResolveToolDirectory(t *testing.T) {
 		is.Equal(result, bin)
 	})
 
-	t.Run("skips_bin_if_multiple_items_at_root", func(t *testing.T) {
+	t.Run("steps_into_bin_if_multiple_items_at_root", func(t *testing.T) {
+		t.Parallel()
+
 		is := is.New(t)
 		root := t.TempDir()
-		mustCreateTestDir(t, filepath.Join(root, "bin"))
+		bin := filepath.Join(root, "bin")
+		mustCreateTestDir(t, bin)
 		mustCreateTestDir(t, filepath.Join(root, "lib"))
 		mustCreateTestFile(t, filepath.Join(root, "file.txt"), "")
 
 		result, err := ResolveToolDirectory(root)
 
 		is.NoErr(err)
-		is.Equal(result, root)
+		is.Equal(result, bin)
 	})
 
-	t.Run("handles_non_existent_path", func(t *testing.T) {
+	t.Run("handles_non_existent_path_error", func(t *testing.T) {
+		t.Parallel()
+
 		is := is.New(t)
 		root := t.TempDir()
 		nonExistentPath := filepath.Join(root, "does-not-exist")
 
-		result, err := ResolveToolDirectory(nonExistentPath)
+		_, err := ResolveToolDirectory(nonExistentPath)
 
-		is.NoErr(err)
-		is.Equal(result, "")
+		is.True(err != nil)
 	})
 
 	t.Run("handles_file_path_error", func(t *testing.T) {
+		t.Parallel()
+
 		is := is.New(t)
 		root := t.TempDir()
 		filePath := filepath.Join(root, "file.txt")
