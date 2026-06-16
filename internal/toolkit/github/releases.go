@@ -10,6 +10,28 @@ import (
 	"github.com/google/go-github/v88/github"
 )
 
+var (
+	// osIndicators maps OS names to their file name indicators.
+	osIndicators = map[string][]string{
+		"darwin":  {"darwin", "macos", "mac"},
+		"windows": {"windows", "win"},
+		"linux":   {"linux"},
+	}
+
+	// archIndicators maps arch names to their file name indicators.
+	archIndicators = map[string][]string{
+		"amd64": {"amd64", "x86_64", "x64", "64bit"},
+		"arm64": {"arm64", "aarch64"},
+		"386":   {"386", "x86", "ia32", "i386", "32bit"},
+	}
+
+	// allOSIndicators is a flattened list of all known OS indicators.
+	allOSIndicators = flatten(osIndicators)
+
+	// allArchIndicators is a flattened list of all known arch indicators.
+	allArchIndicators = flatten(archIndicators)
+)
+
 // ReleaseResolution is the selected release, asset, and normalized version to install.
 type ReleaseResolution struct {
 	Version   string
@@ -179,7 +201,7 @@ func normalizeVersion(value string) string {
 // 1. Tool name match (exact, substring, or fallback to repo name)
 // 2. OS and arch specificity (optional but preferred)
 // 3. Archive format preference (tar.gz > tgz > tar > zip)
-// 4. Variant preference (non-musl preferred over musl)
+// 4. Variant preference (non-musl preferred over musl, negative scoring allows fallback while penalizing undesirable variants)
 // Assets matching by name are accepted even without OS/arch specificity.
 func selectAsset(assets []*github.ReleaseAsset, toolName, repo, osName, arch string) (*github.ReleaseAsset, error) {
 	if len(assets) == 0 {
@@ -208,25 +230,46 @@ func selectAsset(assets []*github.ReleaseAsset, toolName, repo, osName, arch str
 			continue
 		}
 
-		// Score OS and arch matches
+		// Score OS and arch matches (0 if no match, can be multiple matches)
 		osScore := tokenScore(assetName, osTokens)
 		archScore := tokenScore(assetName, archTokens)
 
-		// Allow OS/arch-less matches if name matches; prefer OS/arch-specific matches
-		if osScore == 0 && archScore == 0 {
-			// Name-only match: lower priority
-			score := (nameScore * 10000) + archiveScore(assetName) + variantScore(assetName)
-			candidates = append(candidates, &candidate{asset: asset, score: score})
-		} else if osScore > 0 && archScore > 0 {
-			// Full OS+arch match: highest priority
-			score := (nameScore * 10000) + (osScore * 1000) + (archScore * 1000) + archiveScore(assetName) + variantScore(assetName)
-			candidates = append(candidates, &candidate{asset: asset, score: score})
-		}
+		// All name-matched assets are candidates; scoring determines ranking.
+		// Higher scores for better matches, negative scoring penalizes undesirable variants.
+		score := (nameScore * 100000) + (osScore * 10000) + (archScore * 10000) + archiveScore(assetName) + variantScore(assetName)
+		candidates = append(candidates, &candidate{asset: asset, score: score})
 	}
 
 	if len(candidates) == 0 {
 		return nil, fmt.Errorf("no matching release asset found for tool=%s repo=%s os=%s arch=%s", toolName, repo, osName, arch)
 	}
+
+	// Filter: reject assets with explicit OS/arch indicators that don't match our requested OS/arch.
+	// Assets without explicit indicators are generic fallbacks and always acceptable.
+	filtered := []*candidate{}
+candidateLoop:
+	for _, c := range candidates {
+		assetName := strings.ToLower(c.asset.GetName())
+
+		// If asset has an OS indicator, it must match our requested OS
+		if hasOSIndicator(assetName) && tokenScore(assetName, osTokens) == 0 {
+			continue candidateLoop
+		}
+
+		// If asset has an arch indicator, it must match our requested arch
+		if hasArchIndicator(assetName) && tokenScore(assetName, archTokens) == 0 {
+			continue candidateLoop
+		}
+
+		// Asset passed all checks: accept it
+		filtered = append(filtered, c)
+	}
+
+	if len(filtered) == 0 {
+		return nil, fmt.Errorf("no matching release asset found for tool=%s repo=%s os=%s arch=%s", toolName, repo, osName, arch)
+	}
+
+	candidates = filtered
 
 	sort.Slice(candidates, func(i, j int) bool {
 		return candidates[i].score > candidates[j].score
@@ -301,28 +344,45 @@ func variantScore(name string) int {
 	return 0
 }
 
-func mapOS(osName string) []string {
-	switch osName {
-	case "darwin":
-		return []string{"darwin", "macos", "mac"}
-	case "windows":
-		return []string{"windows", "win"}
-	case "linux":
-		return []string{"linux"}
-	default:
-		return []string{strings.ToLower(osName)}
+// hasOSIndicator checks if name contains any known OS indicator.
+func hasOSIndicator(name string) bool {
+	for _, indicator := range allOSIndicators {
+		if strings.Contains(name, indicator) {
+			return true
+		}
 	}
+	return false
+}
+
+// hasArchIndicator checks if name contains any known arch indicator.
+func hasArchIndicator(name string) bool {
+	for _, indicator := range allArchIndicators {
+		if strings.Contains(name, indicator) {
+			return true
+		}
+	}
+	return false
+}
+
+func mapOS(osName string) []string {
+	if tokens, ok := osIndicators[osName]; ok {
+		return tokens
+	}
+	return []string{strings.ToLower(osName)}
 }
 
 func mapArch(arch string) []string {
-	switch arch {
-	case "amd64":
-		return []string{"amd64", "x86_64", "x64"}
-	case "arm64":
-		return []string{"arm64", "aarch64"}
-	case "386":
-		return []string{"386", "x86", "ia32", "i386"}
-	default:
-		return []string{strings.ToLower(arch)}
+	if tokens, ok := archIndicators[arch]; ok {
+		return tokens
 	}
+	return []string{strings.ToLower(arch)}
+}
+
+// flatten extracts all values from a map and returns them as a single slice.
+func flatten(m map[string][]string) []string {
+	var result []string
+	for _, tokens := range m {
+		result = append(result, tokens...)
+	}
+	return result
 }
