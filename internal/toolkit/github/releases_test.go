@@ -1,7 +1,7 @@
 package github
 
 import (
-	"strings"
+	"regexp"
 	"testing"
 
 	"github.com/google/go-github/v88/github"
@@ -9,7 +9,9 @@ import (
 )
 
 func Test_normalizeVersion(t *testing.T) {
-	tests := []struct {
+	t.Parallel()
+
+	for _, tt := range []struct {
 		name  string
 		input string
 		want  string
@@ -17,10 +19,10 @@ func Test_normalizeVersion(t *testing.T) {
 		{name: "plain_version", input: "1.2.3", want: "1.2.3"},
 		{name: "v_prefixed", input: "v1.2.3", want: "1.2.3"},
 		{name: "refs_tags_prefixed", input: "refs/tags/v1.2.3", want: "1.2.3"},
-	}
-
-	for _, tt := range tests {
+	} {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			is := is.New(t)
 
 			got := normalizeVersion(tt.input)
@@ -31,99 +33,140 @@ func Test_normalizeVersion(t *testing.T) {
 }
 
 func Test_selectRelease(t *testing.T) {
+	t.Parallel()
+
 	releases := []*github.RepositoryRelease{
 		{TagName: new("v1.1.0")},
 		{TagName: new("v1.2.0")},
 		{TagName: new("v2.0.0-rc.1"), Prerelease: new(true)},
 	}
 
-	t.Run("selects_latest_stable_by_default", func(t *testing.T) {
-		is := is.New(t)
+	for _, tt := range []struct {
+		name              string
+		version           string
+		includePrerelease bool
+		wantTagName       string
+		wantVersion       string
+		wantErr           bool
+	}{
+		{
+			name:              "selects_latest_stable_by_default",
+			version:           "latest",
+			includePrerelease: false,
+			wantTagName:       "v1.2.0",
+			wantVersion:       "1.2.0",
+		},
+		{
+			name:              "selects_latest_including_prerelease_when_enabled",
+			version:           "latest",
+			includePrerelease: true,
+			wantTagName:       "v2.0.0-rc.1",
+			wantVersion:       "2.0.0-rc.1",
+		},
+		{
+			name:              "matches_exact_without_v_prefix",
+			version:           "1.1.0",
+			includePrerelease: false,
+			wantTagName:       "v1.1.0",
+			wantVersion:       "1.1.0",
+		},
+		{
+			name:              "matches_exact_with_v_prefix",
+			version:           "v1.1.0",
+			includePrerelease: false,
+			wantTagName:       "v1.1.0",
+			wantVersion:       "1.1.0",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		release, version, err := selectRelease(releases, "latest", false)
+			is := is.New(t)
 
-		is.NoErr(err)
-		is.Equal(release.GetTagName(), "v1.2.0")
-		is.Equal(version, "1.2.0")
-	})
+			release, version, err := selectRelease(releases, tt.version, tt.includePrerelease)
 
-	t.Run("selects_latest_including_prerelease_when_enabled", func(t *testing.T) {
-		is := is.New(t)
-
-		release, version, err := selectRelease(releases, "latest", true)
-
-		is.NoErr(err)
-		is.Equal(release.GetTagName(), "v2.0.0-rc.1")
-		is.Equal(version, "2.0.0-rc.1")
-	})
-
-	t.Run("matches_exact_without_v_prefix", func(t *testing.T) {
-		is := is.New(t)
-
-		release, version, err := selectRelease(releases, "1.1.0", false)
-
-		is.NoErr(err)
-		is.Equal(release.GetTagName(), "v1.1.0")
-		is.Equal(version, "1.1.0")
-	})
-
-	t.Run("matches_exact_with_v_prefix", func(t *testing.T) {
-		is := is.New(t)
-
-		release, version, err := selectRelease(releases, "v1.1.0", false)
-
-		is.NoErr(err)
-		is.Equal(release.GetTagName(), "v1.1.0")
-		is.Equal(version, "1.1.0")
-	})
+			is.NoErr(err)
+			is.Equal(release.GetTagName(), tt.wantTagName)
+			is.Equal(version, tt.wantVersion)
+		})
+	}
 }
 
 func Test_selectAsset(t *testing.T) {
-	assets := []*github.ReleaseAsset{
+	t.Parallel()
+
+	defaultAssets := []*github.ReleaseAsset{
 		{Name: new("tool_v1.2.3_linux_x64.tar.gz"), BrowserDownloadURL: new("https://example.com/tar.gz")},
 		{Name: new("tool_v1.2.3_linux_x64.zip"), BrowserDownloadURL: new("https://example.com/zip")},
 		{Name: new("tool_v1.2.3_darwin_x64.tar.gz"), BrowserDownloadURL: new("https://example.com/darwin")},
+		{Name: new("tool_v1.2.3.tar.gz"), BrowserDownloadURL: new("https://example.com/none")},
 	}
 
-	t.Run("selects_best_matching_asset", func(t *testing.T) {
-		is := is.New(t)
+	for _, tt := range []struct {
+		name     string
+		assets   []*github.ReleaseAsset
+		toolName string
+		toolRepo string
+		goos     string
+		goarch   string
+		want     string
+		wantErr  string
+	}{
+		{
+			name:     "selects_best_matching_asset",
+			assets:   defaultAssets,
+			toolName: "tool",
+			toolRepo: "toolrepo",
+			goos:     "linux",
+			goarch:   "amd64",
+			want:     "tool_v1.2.3_linux_x64.tar.gz",
+		},
+		{
+			name:     "fallback_to_name_match_when_os_arch_not_found",
+			assets:   defaultAssets,
+			toolName: "tool",
+			toolRepo: "toolrepo",
+			goos:     "windows",
+			goarch:   "arm64",
+			want:     "tool_v1.2.3.tar.gz",
+		},
+		{
+			name:     "errors_when_no_name_match",
+			assets:   defaultAssets,
+			toolName: "unknown",
+			toolRepo: "toolrepo",
+			goos:     "windows",
+			goarch:   "arm64",
+			wantErr:  "no matching release asset found",
+		},
+		{
+			name: "prefers_non_musl_over_musl_when_both_match",
+			assets: []*github.ReleaseAsset{
+				{Name: new("mdq-linux-x64-musl.tar.gz"), BrowserDownloadURL: new("https://example.com/musl")},
+				{Name: new("mdq-linux-x64.tar.gz"), BrowserDownloadURL: new("https://example.com/glibc")},
+			},
+			toolName: "mdq",
+			toolRepo: "mdq",
+			goos:     "linux",
+			goarch:   "amd64",
+			want:     "mdq-linux-x64.tar.gz",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		asset, err := selectAsset(assets, "tool", "toolrepo", "linux", "amd64")
+			is := is.New(t)
 
-		is.NoErr(err)
-		is.Equal(asset.GetName(), "tool_v1.2.3_linux_x64.tar.gz")
-	})
+			asset, err := selectAsset(tt.assets, tt.toolName, tt.toolRepo, tt.goos, tt.goarch)
 
-	t.Run("fallback_to_name_match_when_os_arch_not_found", func(t *testing.T) {
-		is := is.New(t)
+			if tt.wantErr != "" {
+				is.True(regexp.MustCompile(regexp.QuoteMeta(tt.wantErr)).MatchString(err.Error())) // Expect error to match
+				return
+			}
 
-		// Tool name matches even without matching OS/arch
-		asset, err := selectAsset(assets, "tool", "toolrepo", "windows", "arm64")
-
-		is.NoErr(err)
-		is.True(asset != nil)
-		is.True(strings.Contains(asset.GetName(), "tool"))
-	})
-
-	t.Run("errors_when_no_name_match", func(t *testing.T) {
-		is := is.New(t)
-
-		_, err := selectAsset(assets, "unknown", "toolrepo", "windows", "arm64")
-
-		is.True(err != nil)
-	})
-
-	t.Run("prefers_non_musl_over_musl_when_both_match", func(t *testing.T) {
-		is := is.New(t)
-
-		assets := []*github.ReleaseAsset{
-			{Name: new("mdq-linux-x64-musl.tar.gz"), BrowserDownloadURL: new("https://example.com/musl")},
-			{Name: new("mdq-linux-x64.tar.gz"), BrowserDownloadURL: new("https://example.com/glibc")},
-		}
-
-		asset, err := selectAsset(assets, "mdq", "mdq", "linux", "amd64")
-
-		is.NoErr(err)
-		is.Equal(asset.GetName(), "mdq-linux-x64.tar.gz")
-	})
+			is.NoErr(err)                      // Expect no error
+			is.True(asset != nil)              // Expect asset to be non-nil
+			is.Equal(asset.GetName(), tt.want) // Expect asset name to match
+		})
+	}
 }
