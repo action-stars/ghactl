@@ -7,7 +7,7 @@ require (
 	github.com/google/go-github/v88 v88.0.0
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/matryer/is v1.4.1
-	github.com/urfave/cli/v3 v3.9.1
+	github.com/urfave/cli/v3 v3.10.1
 	golang.org/x/crypto v0.53.0
 )
 
