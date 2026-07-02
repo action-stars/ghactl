@@ -208,7 +208,13 @@ func CacheFile(source, targetName, tool, version, arch string) (string, error) {
 		return "", err
 	}
 
-	if err := fileio.CopyFile(source, filepath.Join(toolPath, targetName), false); err != nil {
+	targetPath := filepath.Join(toolPath, targetName)
+
+	if err := fileio.CopyFile(source, targetPath, false); err != nil {
+		return "", err
+	}
+
+	if err := ensureExecutable(targetPath); err != nil {
 		return "", err
 	}
 
