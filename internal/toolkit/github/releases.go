@@ -224,6 +224,11 @@ func selectAsset(assets []*github.ReleaseAsset, toolName, repo, osName, arch str
 
 		assetName := strings.ToLower(asset.GetName())
 
+		// Ignore sidecar or checksum files (e.g., .sha256, .sig, .asc)
+		if isSidecarAsset(assetName) {
+			continue
+		}
+
 		// Score based on name match first (tool name preferred, then repo name)
 		nameScore := scoreNameMatch(assetName, toolName, repo)
 		if nameScore == 0 {
@@ -287,6 +292,17 @@ candidateLoop:
 	}
 
 	return best.asset, nil
+}
+
+// isSidecarAsset returns true if the asset name indicates a sidecar or checksum file.
+func isSidecarAsset(name string) bool {
+	extensions := []string{".sha1", ".sha256", ".sha512", ".sha256sum", ".sha512sum", ".sig", ".asc"}
+	for _, ext := range extensions {
+		if strings.HasSuffix(name, ext) {
+			return true
+		}
+	}
+	return false
 }
 
 // scoreNameMatch returns a score indicating how well the asset name matches the tool.
