@@ -21,6 +21,9 @@ updates:
           - patch
     commit-message:
       prefix: deps
+    labels:
+      - dependency
+      - dependency/github-actions
     schedule:
       interval: weekly
 
@@ -44,5 +47,8 @@ updates:
           - patch
     commit-message:
       prefix: deps
+    labels:
+      - dependency
+      - dependency/go
     schedule:
       interval: weekly
