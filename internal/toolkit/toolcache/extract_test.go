@@ -11,17 +11,17 @@ import (
 
 func TestExtractTar(t *testing.T) {
 	tests := []struct {
-		name    string
-		temp    string
-		file    string
-		gz      bool
-		wantErr bool
+		name      string
+		tempUnset bool
+		file      string
+		gz        bool
+		wantErr   bool
 	}{
 		{
-			name:    "errors_if_temp_dir_is_not_defined",
-			temp:    "UNSET",
-			file:    "../../../testdata/file-and-dir.tar",
-			wantErr: true,
+			name:      "errors_if_temp_dir_is_not_defined",
+			tempUnset: true,
+			file:      "../../../testdata/file-and-dir.tar",
+			wantErr:   true,
 		},
 		{
 			name:    "errors_if_cannot_extract_from_invalid_tar_file",
@@ -43,12 +43,11 @@ func TestExtractTar(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			is := is.New(t)
 
-			temp := tt.temp
-			switch temp {
-			case "":
-				temp = t.TempDir()
-			case "UNSET":
+			temp := ""
+			if tt.tempUnset {
 				temp = ""
+			} else {
+				temp = t.TempDir()
 			}
 			t.Setenv("RUNNER_TEMP", temp)
 			t.Setenv("TEMPDIR", "")
@@ -71,16 +70,16 @@ func TestExtractTar(t *testing.T) {
 
 func TestExtractZip(t *testing.T) {
 	tests := []struct {
-		name    string
-		temp    string
-		file    string
-		wantErr bool
+		name      string
+		tempUnset bool
+		file      string
+		wantErr   bool
 	}{
 		{
-			name:    "errors_if_temp_dir_is_not_defined",
-			temp:    "UNSET",
-			file:    "../../../testdata/file-and-dir.zip",
-			wantErr: true,
+			name:      "errors_if_temp_dir_is_not_defined",
+			tempUnset: true,
+			file:      "../../../testdata/file-and-dir.zip",
+			wantErr:   true,
 		},
 		{
 			name:    "errors_if_cannot_extract_from_invalid_zip_file",
@@ -97,12 +96,11 @@ func TestExtractZip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			is := is.New(t)
 
-			temp := tt.temp
-			switch temp {
-			case "":
-				temp = t.TempDir()
-			case "UNSET":
+			temp := ""
+			if tt.tempUnset {
 				temp = ""
+			} else {
+				temp = t.TempDir()
 			}
 			t.Setenv("RUNNER_TEMP", temp)
 			t.Setenv("TEMPDIR", "")

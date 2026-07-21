@@ -67,8 +67,9 @@ func extractTarEntry(root *os.Root, header *tar.Header, r io.Reader) error {
 
 	switch header.Typeflag {
 	case tar.TypeDir:
-		if err := root.MkdirAll(name, 0o755); err != nil {
-			return fmt.Errorf("creating directory %s: %w", name, err)
+		dir := path.Clean(name)
+		if err := root.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("creating directory %s: %w", dir, err)
 		}
 
 	case tar.TypeReg:

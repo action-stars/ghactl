@@ -211,6 +211,22 @@ func Test_selectAsset(t *testing.T) {
 			goarch:   "amd64",
 			wantErr:  "no matching release asset found",
 		},
+		{
+			name: "can_find_self",
+			assets: []*github.ReleaseAsset{
+				{Name: new("checksums.txt"), BrowserDownloadURL: new("https://example.com/checksums.txt")},
+				{Name: new("checksums.txt.sbom.json.bundle"), BrowserDownloadURL: new("https://example.com/checksums.txt.sbom.json.bundle")},
+				{Name: new("ghactl_0.0.11_linux_amd64.tar.gz"), BrowserDownloadURL: new("https://example.com/ghactl_0.0.11_linux_amd64.tar.gz")},
+				{Name: new("ghactl_0.0.11_linux_arm64.tar.gz"), BrowserDownloadURL: new("https://example.com/ghactl_0.0.11_linux_arm64.tar.gz")},
+				{Name: new("ghactl_0.0.11_windows_amd64.tar.gz"), BrowserDownloadURL: new("https://example.com/ghactl_0.0.11_windows_amd64.tar.gz")},
+				{Name: new("ghactl_0.0.11_windows_arm64.tar.gz"), BrowserDownloadURL: new("https://example.com/ghactl_0.0.11_windows_arm64.tar.gz")},
+			},
+			toolName: "ghactl",
+			toolRepo: "ghactl",
+			goos:     "linux",
+			goarch:   "amd64",
+			want:     "ghactl_0.0.11_linux_amd64.tar.gz",
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
