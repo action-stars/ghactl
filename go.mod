@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/matryer/is v1.4.1
 	github.com/urfave/cli/v3 v3.10.1
-	golang.org/x/crypto v0.54.0
+	golang.org/x/crypto v0.55.0
 )
 
 require (
