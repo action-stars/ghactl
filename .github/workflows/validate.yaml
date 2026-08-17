@@ -57,6 +57,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     permissions:
+      code-quality: write
       contents: read
       security-events: write
     defaults:
