@@ -178,7 +178,7 @@ func Test_selectAsset(t *testing.T) {
 			want:     "hadolint-windows-x86_64.exe",
 		},
 		{
-			name: "ignores_checksum_assets_when_selecting",
+			name: "ignores_sidecar_assets_when_selecting",
 			assets: []*github.ReleaseAsset{
 				{Name: new("hadolint-linux-x86_64"), BrowserDownloadURL: new("https://example.com/hadolint-linux-x86_64")},
 				{Name: new("hadolint-linux-x86_64.sha1"), BrowserDownloadURL: new("https://example.com/hadolint-linux-x86_64.sha1")},
@@ -188,6 +188,8 @@ func Test_selectAsset(t *testing.T) {
 				{Name: new("hadolint-linux-x86_64.sha512sum"), BrowserDownloadURL: new("https://example.com/hadolint-linux-x86_64.sha512sum")},
 				{Name: new("hadolint-linux-x86_64.sig"), BrowserDownloadURL: new("https://example.com/hadolint-linux-x86_64.sig")},
 				{Name: new("hadolint-linux-x86_64.asc"), BrowserDownloadURL: new("https://example.com/hadolint-linux-x86_64.asc")},
+				{Name: new("hadolint-linux-x86_64.spdx.json"), BrowserDownloadURL: new("https://example.com/hadolint-linux-x86_64.spdx.json")},
+				{Name: new("hadolint-linux-x86_64.pem"), BrowserDownloadURL: new("https://example.com/hadolint-linux-x86_64.pem")},
 			},
 			toolName: "hadolint",
 			toolRepo: "hadolint",

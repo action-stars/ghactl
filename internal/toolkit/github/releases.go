@@ -30,6 +30,9 @@ var (
 
 	// allArchIndicators is a flattened list of all known arch indicators.
 	allArchIndicators = flatten(archIndicators)
+
+	// sidecarExtensions is a list of extensions to ignore.
+	sidecarExtensions = []string{".sha1", ".sha256", ".sha512", ".sha256sum", ".sha512sum", ".sig", ".asc", ".json", ".pem"}
 )
 
 // ReleaseResolution is the selected release, asset, and normalized version to install.
@@ -296,8 +299,7 @@ candidateLoop:
 
 // isSidecarAsset returns true if the asset name indicates a sidecar or checksum file.
 func isSidecarAsset(name string) bool {
-	extensions := []string{".sha1", ".sha256", ".sha512", ".sha256sum", ".sha512sum", ".sig", ".asc"}
-	for _, ext := range extensions {
+	for _, ext := range sidecarExtensions {
 		if strings.HasSuffix(name, ext) {
 			return true
 		}
