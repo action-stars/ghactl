@@ -111,7 +111,7 @@ jobs:
             exit 1
           fi
       - name: Upload coverage report
-        uses: actions/upload-code-coverage@d8e329117199404bba6fc81efe8093dc7c015e34 # v1.4.2
+        uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1.4.4
         with:
           language: Go
           label: code-coverage
@@ -148,7 +148,7 @@ jobs:
           ' "${INPUT_TOTAL_COVERAGE}" "${INPUT_MIN_COVERAGE}" "${status}" "${report}" >> "${GITHUB_STEP_SUMMARY}"
       - name: Upload coverage artifact
         if: always() && steps.test.outputs.coverage_file != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage
           path: |
@@ -179,7 +179,7 @@ jobs:
           go-version-file: go.mod
           cache: false
       - name: Install Syft
-        uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           syft-version: latest
 
@@ -188,7 +188,7 @@ jobs:
 
       - name: Run GoReleaser
         id: goreleaser
-        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -215,7 +215,7 @@ jobs:
 
       - name: Upload artifact
         id: upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: binaries
           path: ${{ steps.metadata.outputs.output_dir }}
